@@ -7,13 +7,18 @@ import os
 
 app = FastAPI(title="Smeta PWA")
 
+# Определяем базовую директорию проекта
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+INDEX_HTML = os.path.join(BASE_DIR, "index.html")
+
 # Подключаем статику (frontend)
-app.mount("/static", StaticFiles(directory="webapp/static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 async def root():
     """Отдаем главную страницу"""
-    return FileResponse("webapp/index.html")
+    return FileResponse(INDEX_HTML)
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
