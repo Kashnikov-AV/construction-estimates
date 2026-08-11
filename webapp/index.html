@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка смет (PWA)</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4a90e2">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 { margin-bottom: 1.5rem; font-size: 1.5rem; }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            position: relative;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #4a90e2;
+            background-color: #f0f7ff;
+        }
+        input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0; left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #357abd; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .status { margin-top: 1rem; font-size: 0.9rem; min-height: 1.2em; }
+        .icon { font-size: 3rem; margin-bottom: 1rem; color: #4a90e2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="icon">📊</div>
+    <h1>Загрузка сметы</h1>
+    
+    <div class="upload-area" id="dropZone">
+        <p>Нажмите или перетащите файл Excel сюда</p>
+        <input type="file" id="fileInput" accept=".xlsx, .xls">
+    </div>
+
+    <button id="uploadBtn" disabled>Обработать и скачать CSV</button>
+    <div class="status" id="status"></div>
+</div>
+
+<script>
+    // Регистрация Service Worker для PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then(reg => console.log('SW зарегистрирован', reg))
+            .catch(err => console.error('Ошибка SW', err));
+    }
+
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const statusDiv = document.getElementById('status');
+    const dropZone = document.getElementById('dropZone');
+
+    let selectedFile = null;
+
+    // Обработка выбора файла
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    // Drag & Drop визуализация
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    }, false);
+
+    function handleFile(file) {
+        selectedFile = file;
+        statusDiv.textContent = `Выбран файл: ${file.name}`;
+        uploadBtn.disabled = false;
+    }
+
+    // Загрузка на сервер
+    uploadBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        uploadBtn.disabled = true;
+        statusDiv.textContent = 'Обработка...';
+
+        try {
+            const response = await fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Ошибка загрузки');
+            }
+
+            // Скачивание результата
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // Пытаемся получить имя из заголовка или генерируем
+            const disposition = response.headers.get('Content-Disposition');
+            let filename = 'result.csv';
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) { 
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            statusDiv.textContent = 'Готово! Файл скачан.';
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                uploadBtn.disabled = false;
+                selectedFile = null;
+                fileInput.value = '';
+            }, 3000);
+
+        } catch (error) {
+            statusDiv.textContent = `Ошибка: ${error.message}`;
+            uploadBtn.disabled = false;
+        }
+    });
+</script>
+
+</body>
+</html>
