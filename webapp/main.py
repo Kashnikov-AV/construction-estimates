@@ -5,6 +5,11 @@ import pandas as pd
 import io
 import os
 
+# Импорт бизнес-логики из core
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.estimates import parse_estimate as core_parse_estimate, export_to_csv
+
 app = FastAPI(title="Smeta PWA")
 
 # Определяем базовую директорию проекта

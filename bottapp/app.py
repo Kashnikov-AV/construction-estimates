@@ -15,6 +15,11 @@ from aiogram.client.telegram import TelegramAPIServer
 from aiogram.exceptions import TelegramNetworkError
 from xlea import Schema, Column, config
 
+# Импорт бизнес-логики из core
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.estimates import parse_estimate as core_parse_estimate, export_to_csv
+
 BOT_TOKEN = "8967391567:AAHa6VD74hzBiZhvvP3g62TiV0wZa5eLgxU"
 PROXY_URL = "https://gentle-tree-1a2f.fln5kqj50.workers.dev"   # если нужен прокси
 
