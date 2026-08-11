@@ -4,29 +4,57 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
+.venv/
 venv/
 env/
-ENV/
-.venv/
-.env
-.env.local
-.env.*
-.envrc
-# Build artifacts
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Build and distribution artifacts
 build/
 dist/
 *.egg
 *.egg-info/
 *.so
+*.dylib
+*.dll
+*.exe
+
+# Testing
+.coverage
+htmlcov/
+.coverage.*
+.cache
+.pytest_cache/
+.hypothesis/
+
 # Logs
 *.log
-# Environment specific
+
+# Environment variables
 .env
 .env.local
-# Editors
+.env.dev
+.env.production
+.env.*
+
+# Editors and IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Python specific
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
 ```
