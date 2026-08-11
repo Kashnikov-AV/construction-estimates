@@ -18,7 +18,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/")
 async def root():
     """Отдаем главную страницу"""
-    return FileResponse(INDEX_HTML)
+    return FileResponse(INDEX_HTML, media_type="text/html")
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
@@ -34,7 +34,18 @@ async def upload_file(file: UploadFile = File(...)):
         contents = await file.read()
         
         # Читаем Excel с явным указанием движка для поддержки xls/xlsx
-        df = pd.read_excel(io.BytesIO(contents), engine='openpyxl' if file.filename.endswith('.xlsx') else 'xlrd')
+        engine = 'openpyxl' if file.filename.endswith('.xlsx') else 'xlrd'
+        
+        try:
+            df = pd.read_excel(io.BytesIO(contents), engine=engine)
+        except Exception as e:
+            # Если не получилось прочитать, пробуем без явного указания движка (иногда помогает)
+            # или пробуем другой движок если первый не сработал
+            if engine == 'xlrd':
+                 # Пробуем openpyxl если xlrd не справился (редкий случай для старых xls)
+                 df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
+            else:
+                 raise e
 
         # --- ЗДЕСЬ БУДЕТ ЛОГИКА ОБРАБОТКИ (как в телеграм боте) ---
         # Пока просто сохраняем как есть
@@ -42,15 +53,19 @@ async def upload_file(file: UploadFile = File(...)):
         # Сохраняем результат в буфер CSV с кодировкой UTF-8
         stream = io.StringIO()
         # to_csv в StringIO уже работает с юникодом, но явно укажем, что мы работаем с текстом
+        # utf-8-sig добавляет BOM, чтобы Excel корректно открывал кириллицу
         df.to_csv(stream, index=False, sep=';', encoding='utf-8-sig') 
         csv_content = stream.getvalue()
 
         # Возвращаем файл пользователю
-        # utf-8-sig добавляет BOM, чтобы Excel корректно открывал кириллицу
+        # Кодируем в UTF-8 перед отправкой
+        csv_bytes = csv_content.encode('utf-8')
+        
         headers = {
-            "Content-Disposition": f"attachment; filename*=UTF-8''processed_{file.filename.replace('.', '_')}.csv"
+            "Content-Disposition": f"attachment; filename*=UTF-8''processed_{file.filename.replace('.', '_')}.csv",
+            "Access-Control-Expose-Headers": "Content-Disposition"
         }
-        return StreamingResponse(iter([csv_content.encode('utf-8')]), media_type="text/csv", headers=headers)
+        return StreamingResponse(iter([csv_bytes]), media_type="text/csv; charset=utf-8", headers=headers)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка обработки файла: {str(e)}")
