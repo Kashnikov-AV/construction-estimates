@@ -59,10 +59,10 @@ async def upload_file(file: UploadFile = File(...)):
 
         # Возвращаем файл пользователю
         # Кодируем в UTF-8 перед отправкой
-        csv_bytes = csv_content.encode('utf-8')
+        csv_bytes = csv_content.encode('utf-8-sig')
         
         headers = {
-            "Content-Disposition": f"attachment; filename*=UTF-8''processed_{file.filename.replace('.', '_')}.csv",
+            "Content-Disposition": f"attachment; filename*=estimate.csv",
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
         return StreamingResponse(iter([csv_bytes]), media_type="text/csv; charset=utf-8", headers=headers)
