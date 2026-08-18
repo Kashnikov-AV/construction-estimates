@@ -37,51 +37,41 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Файл должен быть в формате .xlsx или .xls")
 
     try:
-        # Читаем файл в память
+        # Читаем файл в память (BytesIO)
         contents = await file.read()
+        file_stream = io.BytesIO(contents)
         
-        # Сохраняем во временный файл для обработки
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename)[1], delete=False) as tmp:
-            tmp.write(contents)
-            tmp_path = tmp.name
+        # Обрабатываем файл через функцию парсинга напрямую из потока
+        dfs = core_parse_estimate(file_stream)
         
-        try:
-            # Обрабатываем файл через функцию парсинга
-            dfs = core_parse_estimate(tmp_path)
-            
-            if not dfs:
-                raise HTTPException(status_code=400, detail="Не удалось извлечь данные из файла")
-            
-            # Получаем базовое имя файла без расширения
-            base_filename = os.path.splitext(file.filename)[0]
-            
-            # Экспортируем в CSV (или ZIP если несколько листов)
-            result = export_estimates_to_csv(dfs, base_filename)
-            
-            # Определяем тип контента и имя файла
-            if len(dfs) == 1:
-                # Один лист - возвращаем CSV
-                media_type = "text/csv; charset=utf-8"
-                output_filename = f"{base_filename}.csv"
-            else:
-                # Несколько листов - возвращаем ZIP
-                media_type = "application/zip"
-                output_filename = f"{base_filename}.zip"
-            
-            # Кодируем имя файла для поддержки кириллицы (RFC 5987)
-            encoded_filename = urllib.parse.quote(output_filename.encode('utf-8'))
-            
-            headers = {
-                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-            
-            return StreamingResponse(iter([result]), media_type=media_type, headers=headers)
-            
-        finally:
-            # Удаляем временный файл
-            os.unlink(tmp_path)
+        if not dfs:
+            raise HTTPException(status_code=400, detail="Не удалось извлечь данные из файла")
+        
+        # Получаем базовое имя файла без расширения
+        base_filename = os.path.splitext(file.filename)[0]
+        
+        # Экспортируем в CSV (или ZIP если несколько листов)
+        result = export_estimates_to_csv(dfs, base_filename)
+        
+        # Определяем тип контента и имя файла
+        if len(dfs) == 1:
+            # Один лист - возвращаем CSV
+            media_type = "text/csv; charset=utf-8"
+            output_filename = f"{base_filename}.csv"
+        else:
+            # Несколько листов - возвращаем ZIP
+            media_type = "application/zip"
+            output_filename = f"{base_filename}.zip"
+        
+        # Кодируем имя файла для поддержки кириллицы (RFC 5987)
+        encoded_filename = urllib.parse.quote(output_filename.encode('utf-8'))
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+        
+        return StreamingResponse(iter([result]), media_type=media_type, headers=headers)
 
     except HTTPException:
         raise
