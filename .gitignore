@@ -1,1 +1,2 @@
 Nothing needs to be added to .gitignore since only source files (.py, .md) were modified.
+*.pyc
