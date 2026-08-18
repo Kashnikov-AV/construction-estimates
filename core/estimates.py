@@ -9,7 +9,7 @@ import re
 import zipfile
 import io
 import os
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Union
 
 
 KEYS = ["№ п/п", "Обоснование", "Наименование работ и затрат"]
@@ -33,18 +33,23 @@ def _header_map(row):
     u = next((c for c, s in enumerate(cells) if s.startswith("Единица")), p[2] + 1)
     return {1: p[0], 2: p[1], 3: p[2], 4: u, **{k: u + k - 4 for k in range(5, 13)}}
 
-def parse_estimate(file_path: str, **kwargs: Any) -> List[pd.DataFrame]:
+def parse_estimate(file_input: Union[str, io.BytesIO], **kwargs: Any) -> List[pd.DataFrame]:
     """
     Загружает и обрабатывает файл сметы Excel.
     
     Args:
-        file_path: Путь к файлу сметы
+        file_input: Путь к файлу сметы (str) или байтовый поток (BytesIO)
         **kwargs: Дополнительные параметры для парсинга
     
     Returns:
         Список DataFrame с данными сметы (по одному на каждый лист)
     """
-    xf = pd.ExcelFile(file_path)
+    # Если передан путь к файлу, открываем его; если BytesIO - используем напрямую
+    if isinstance(file_input, str):
+        xf = pd.ExcelFile(file_input)
+    else:
+        xf = pd.ExcelFile(file_input, engine='openpyxl')
+    
     out = []
     for sh in xf.sheet_names:
         raw = xf.parse(sh, header=None).values
