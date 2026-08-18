@@ -5,6 +5,7 @@ import pandas as pd
 import io
 import os
 import urllib.parse
+import re
 
 # Импорт бизнес-логики из core
 import sys
@@ -12,6 +13,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.estimates import parse_estimate as core_parse_estimate, export_estimates_to_csv
 
 app = FastAPI(title="Smeta PWA")
+
+# Таблица транслитерации для кириллицы
+CYRILLIC_TO_LATIN = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+    'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+    'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh',
+    'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O',
+    'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts',
+    'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch', 'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu',
+    'Я': 'Ya'
+}
+
+def transliterate(text: str) -> str:
+    """Транслитерирует кириллический текст в латиницу."""
+    result = []
+    for char in text:
+        result.append(CYRILLIC_TO_LATIN.get(char, char))
+    return ''.join(result)
 
 # Определяем базовую директорию проекта
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -81,15 +103,12 @@ async def upload_file(file: UploadFile = File(...)):
             media_type = "application/zip"
             output_filename = f"{base_filename}.zip"
         
-        # Кодируем имя файла для поддержки кириллицы (RFC 5987)
-        # Используем quote с safe='' чтобы закодировать все спецсимволы
-        encoded_filename = urllib.parse.quote(output_filename, safe='')
-        
-        # Создаем ASCII-версию имени для старых браузеров (заменяем кириллицу на транслит или underscore)
-        ascii_filename = output_filename.encode('ascii', 'replace').decode('ascii').replace('?', '_')
+        # Кодируем имя файла для поддержки кириллицы через транслитерацию
+        # Используем только транслитерированное имя для максимальной совместимости со всеми браузерами
+        translit_filename = transliterate(output_filename)
         
         headers = {
-            "Content-Disposition": f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}",
+            "Content-Disposition": f"attachment; filename=\"{translit_filename}\"",
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
         
