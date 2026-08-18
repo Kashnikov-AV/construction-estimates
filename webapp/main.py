@@ -29,10 +29,19 @@ CYRILLIC_TO_LATIN = {
 }
 
 def transliterate(text: str) -> str:
-    """Транслитерирует кириллический текст в латиницу."""
+    """Транслитерирует кириллический текст в латиницу и удаляет недопустимые символы для имен файлов."""
     result = []
     for char in text:
-        result.append(CYRILLIC_TO_LATIN.get(char, char))
+        # Транслитерируем кириллицу
+        if char in CYRILLIC_TO_LATIN:
+            result.append(CYRILLIC_TO_LATIN[char])
+        # Оставляем только безопасные ASCII символы (буквы, цифры, точка, дефис, подчеркивание)
+        elif ord(char) < 128 and (char.isalnum() or char in '._-'):
+            result.append(char)
+        # Все остальные символы (включая №, пробелы, спецсимволы) заменяем на подчеркивание или пропускаем
+        elif char == ' ':
+            result.append('_')
+        # Остальные недопустимые символы просто пропускаем
     return ''.join(result)
 
 # Определяем базовую директорию проекта
