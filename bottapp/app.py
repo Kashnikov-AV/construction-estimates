@@ -14,10 +14,10 @@ from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram_dialog import Dialog, StartMode, Window
+from aiogram_dialog import Dialog, StartMode, Window, DialogManager
 from aiogram_dialog.widgets.kbd import Cancel, Start
 from aiogram_dialog.widgets.text import Const, Format, Progress
-from aiogram_dialog.widgets.input import TextInput, MessageInput
+from aiogram_dialog.widgets.input import MessageInput
 
 # Импорт бизнес-логики из core
 import sys
