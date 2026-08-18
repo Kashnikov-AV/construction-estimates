@@ -44,11 +44,28 @@ def parse_estimate(file_input: Union[str, io.BytesIO], **kwargs: Any) -> List[pd
     Returns:
         Список DataFrame с данными сметы (по одному на каждый лист)
     """
-    # Если передан путь к файлу, открываем его; если BytesIO - используем напрямую
+    # Определяем тип файла и выбираем подходящий движок
+    # .xlsx - новый формат (Office Open XML), требует openpyxl
+    # .xls - старый бинарный формат, требует xlrd
     if isinstance(file_input, str):
-        xf = pd.ExcelFile(file_input)
+        # Если передан путь, определяем по расширению
+        if file_input.lower().endswith('.xls') and not file_input.lower().endswith('.xlsx'):
+            xf = pd.ExcelFile(file_input, engine='xlrd')
+        else:
+            xf = pd.ExcelFile(file_input, engine='openpyxl')
     else:
-        xf = pd.ExcelFile(file_input, engine='openpyxl')
+        # Если передан BytesIO, пытаемся определить по первым байтам
+        # Или можно передать engine явно через kwargs
+        file_pos = file_input.tell()
+        file_input.seek(0)
+        header = file_input.read(8)
+        file_input.seek(file_pos)
+        
+        # Проверяем сигнатуру файла: xls начинается с D0 CF 11 E0 A1 B1 1A E1
+        if header.startswith(b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'):
+            xf = pd.ExcelFile(file_input, engine='xlrd')
+        else:
+            xf = pd.ExcelFile(file_input, engine='openpyxl')
     
     out = []
     for sh in xf.sheet_names:
