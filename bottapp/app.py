@@ -95,17 +95,22 @@ async def process_estimate(dialog, manager):
     data = manager.get_data()
     file_id = data.get("file_id")
     file_name = data.get("file_name")
+    message = manager.event
     
     if not file_id or not file_name:
         await manager.answer("❌ Ошибка: файл не найден")
         await manager.back()
         return
     
+    # Инициализируем прогресс в данных
+    await manager.update(data={"progress": 0.0})
+    
     progress_message = await manager.answer("⏳ Начинаю обработку...")
     logger.info(f"Начата обработка файла {file_name} от пользователя {manager.event.from_user.id}")
     
     try:
         # Шаг 1: Загрузка файла (25%)
+        await manager.update(data={"progress": 0.25})
         await progress_message.edit_text("⏳ Загрузка файла... [25%]")
         file = await bot.get_file(file_id, timeout=300)
         
@@ -116,6 +121,7 @@ async def process_estimate(dialog, manager):
         logger.info(f"Файл {file_name} загружен во временное хранилище: {tmp_path}")
         
         # Шаг 2: Чтение файла (50%)
+        await manager.update(data={"progress": 0.5})
         await progress_message.edit_text("⏳ Чтение файла... [50%]")
         loop = asyncio.get_event_loop()
         file_content = await loop.run_in_executor(None, lambda: open(tmp_path, 'rb').read())
@@ -124,6 +130,7 @@ async def process_estimate(dialog, manager):
         logger.info(f"Файл {file_name} загружен, размер: {len(file_content)} байт")
         
         # Шаг 3: Парсинг сметы (75%)
+        await manager.update(data={"progress": 0.75})
         await progress_message.edit_text("⏳ Парсинг сметы... [75%]")
         dfs = await loop.run_in_executor(None, core_parse_estimate, file_stream)
         
@@ -136,6 +143,7 @@ async def process_estimate(dialog, manager):
         logger.info(f"Успешно распарсено {len(dfs)} листов из файла {file_name}")
         
         # Шаг 4: Экспорт в CSV (100%)
+        await manager.update(data={"progress": 1.0})
         await progress_message.edit_text("⏳ Экспорт в CSV... [100%]")
         base_filename = os.path.splitext(file_name)[0]
         result_content = await loop.run_in_executor(None, export_estimates_to_csv, dfs, base_filename)
@@ -157,7 +165,8 @@ async def process_estimate(dialog, manager):
             )
         
         # Отправляем результат
-        await manager.answer_document(
+        await bot.send_document(
+            chat_id=message.chat.id,
             document=BufferedInputFile(result_content, filename=output_filename),
             caption=caption
         )
