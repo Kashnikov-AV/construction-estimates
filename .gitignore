@@ -1,16 +1,1 @@
-# Examples
-Input:
-### Added files:
-['bottapp/README.md', 'bottapp/app.py']
-
-### Deleted files:
-[]
-
-### Modified files:
-['bottapp/README.md', 'bottapp/app.py']
-
-### Current .gitignore Content
-(empty)
-
-Expected Output:
-(empty)
+Nothing should be ignored based on the provided file changes. The only modified file is 'bottapp/app.py', which is a source code file and should not be added to .gitignore.
