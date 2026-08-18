@@ -254,29 +254,8 @@ async def command_status_handler(message, dialog_manager):
     await message.answer("✅ Бот работает нормально и готов к обработке файлов.")
 
 
-@dp.message(F.document)
-async def handle_direct_document(message, dialog_manager):
-    """Обработчик прямых загрузок файлов (вне диалога)"""
-    # Если пользователь просто отправил файл без использования диалога
-    document = message.document
-    file_name = document.file_name
-    
-    valid_extensions = ('.xls', '.xlsx')
-    if not any(file_name.lower().endswith(ext) for ext in valid_extensions):
-        await message.answer(
-            f"⚠️ Пожалуйста, загрузите файл в одном из поддерживаемых форматов: **{', '.join(valid_extensions)}**"
-        )
-        return
-    
-    if document.file_size > 20 * 1024 * 1024:
-        await message.answer("⚠️ Размер файла превышает 20 МБ. Пожалуйста, отправьте файл меньшего размера.")
-        return
-    
-    # Автоматически запускаем диалог обработки
-    await dialog_manager.start(EstimateState.waiting_for_file, mode=StartMode.RESET_STACK)
-    # Сохраняем файл в state и переключаемся на обработку
-    await dialog_manager.update(data={"file_id": document.file_id, "file_name": file_name})
-    await dialog_manager.switch_to(EstimateState.processing)
+# Обработчик прямых загрузок файлов добавлен в диалог через MessageInput
+# Эта функция больше не нужна как отдельный хендлер
 
 
 # --- РЕГИСТРАЦИЯ ДИАЛОГОВ ---
