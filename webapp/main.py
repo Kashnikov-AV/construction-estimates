@@ -4,11 +4,12 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import io
 import os
+import urllib.parse
 
 # Импорт бизнес-логики из core
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.estimates import parse_estimate as core_parse_estimate, export_to_csv
+from core.estimates import parse_estimate as core_parse_estimate, export_estimates_to_csv
 
 app = FastAPI(title="Smeta PWA")
 
@@ -28,8 +29,9 @@ async def root():
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     """
-    Принимает Excel файл, обрабатывает и возвращает CSV.
+    Принимает Excel файл, обрабатывает и возвращает CSV (или ZIP с CSV).
     Поддерживает кириллицу в названиях колонок и содержимом.
+    Если файл содержит несколько листов, возвращается ZIP-архив.
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Файл должен быть в формате .xlsx или .xls")
@@ -38,39 +40,49 @@ async def upload_file(file: UploadFile = File(...)):
         # Читаем файл в память
         contents = await file.read()
         
-        # Читаем Excel с явным указанием движка для поддержки xls/xlsx
-        engine = 'openpyxl' if file.filename.endswith('.xlsx') else 'xlrd'
+        # Сохраняем во временный файл для обработки
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename)[1], delete=False) as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
         
         try:
-            df = pd.read_excel(io.BytesIO(contents), engine=engine)
-        except Exception as e:
-            # Если не получилось прочитать, пробуем без явного указания движка (иногда помогает)
-            # или пробуем другой движок если первый не сработал
-            if engine == 'xlrd':
-                 # Пробуем openpyxl если xlrd не справился (редкий случай для старых xls)
-                 df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
+            # Обрабатываем файл через функцию парсинга
+            dfs = core_parse_estimate(tmp_path)
+            
+            if not dfs:
+                raise HTTPException(status_code=400, detail="Не удалось извлечь данные из файла")
+            
+            # Получаем базовое имя файла без расширения
+            base_filename = os.path.splitext(file.filename)[0]
+            
+            # Экспортируем в CSV (или ZIP если несколько листов)
+            result = export_estimates_to_csv(dfs, base_filename)
+            
+            # Определяем тип контента и имя файла
+            if len(dfs) == 1:
+                # Один лист - возвращаем CSV
+                media_type = "text/csv; charset=utf-8"
+                output_filename = f"{base_filename}.csv"
             else:
-                 raise e
+                # Несколько листов - возвращаем ZIP
+                media_type = "application/zip"
+                output_filename = f"{base_filename}.zip"
+            
+            # Кодируем имя файла по RFC 5987 для поддержки кириллицы
+            encoded_filename = urllib.parse.quote(output_filename)
+            headers = {
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+            
+            return StreamingResponse(iter([result]), media_type=media_type, headers=headers)
+            
+        finally:
+            # Удаляем временный файл
+            os.unlink(tmp_path)
 
-        # --- ЗДЕСЬ БУДЕТ ЛОГИКА ОБРАБОТКИ (как в телеграм боте) ---
-        # Пока просто сохраняем как есть
-        
-        # Сохраняем результат в буфер CSV с кодировкой UTF-8
-        stream = io.StringIO()
-        # to_csv в StringIO уже работает с юникодом, но явно укажем, что мы работаем с текстом
-        # utf-8-sig добавляет BOM, чтобы Excel корректно открывал кириллицу
-        df.to_csv(stream, index=False, sep=';', encoding='utf-8-sig') 
-        csv_content = stream.getvalue()
-
-        # Возвращаем файл пользователю
-        # Кодируем в UTF-8 перед отправкой
-        csv_bytes = csv_content.encode('utf-8-sig')
-        
-        headers = {
-            "Content-Disposition": f"attachment; filename*=estimate.csv",
-            "Access-Control-Expose-Headers": "Content-Disposition"
-        }
-        return StreamingResponse(iter([csv_bytes]), media_type="text/csv; charset=utf-8", headers=headers)
-
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка обработки файла: {str(e)}")
