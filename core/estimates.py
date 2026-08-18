@@ -8,6 +8,7 @@ import numpy as np
 import re
 import zipfile
 import io
+import os
 from typing import Optional, Any, List
 
 
@@ -100,6 +101,7 @@ def export_estimates_to_csv(dfs: List[pd.DataFrame], base_filename: str) -> byte
             sheet_name = df.attrs.get("sheet", f"sheet_{i+1}")
             # Очищаем имя листа от недопустимых символов для имени файла
             safe_sheet_name = re.sub(r'[<>:"/\\|?*]', '', sheet_name)
+            # Формируем имя файла: {имя_excel}_{имя_листа}.csv (без транслитерации)
             csv_filename = f"{base_filename}_{safe_sheet_name}.csv"
             
             csv_buffer = io.StringIO()
