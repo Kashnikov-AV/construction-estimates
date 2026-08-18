@@ -285,7 +285,8 @@ dp.include_router(estimate_dialog)
 
 if __name__ == "__main__":
     try:
-        # Увеличенные таймауты для polling
-        asyncio.run(dp.start_polling(bot, poll_timeout=30, allowed_updates=["message", "callback_query"]))
+        # Запускаем polling без явного указания poll_timeout
+        # Таймаут будет взят из настроек сессии (total=300s)
+        asyncio.run(dp.start_polling(bot, allowed_updates=["message", "callback_query"]))
     except KeyboardInterrupt:
         print("Бот остановлен.")
