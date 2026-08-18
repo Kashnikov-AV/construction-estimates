@@ -1,25 +1,3 @@
-```
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+The input shows only a modification to the `.gitignore` file itself, with no other file changes listed. Since there are no build artifacts, dependencies, or temporary files in the change list - only the `.gitignore` modification - no additional ignore rules are needed.
 
-# Dependencies
-.venv/
-venv/
-env/
-.env
-
-# Logs
-*.log
-
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-```
+Output: (nothing)
