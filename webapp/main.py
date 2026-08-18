@@ -70,7 +70,8 @@ async def upload_file(file: UploadFile = File(...)):
                 output_filename = f"{base_filename}.zip"
             
             # Кодируем имя файла по RFC 5987 для поддержки кириллицы
-            encoded_filename = urllib.parse.quote(output_filename)
+            # Используем quote с safe='' чтобы закодировать все спецсимволы
+            encoded_filename = urllib.parse.quote(output_filename.encode('utf-8'))
             headers = {
                 "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
                 "Access-Control-Expose-Headers": "Content-Disposition"
