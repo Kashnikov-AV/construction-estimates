@@ -1,0 +1,6 @@
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+2026-08-18 20:54:15,762 - aiogram.dispatcher - INFO - Start polling
+2026-08-18 20:54:15,961 - aiogram.dispatcher - INFO - Run polling for bot @constestim_bot id=8967391567 - 'constestim_bot'
+2026-08-18 20:54:45,608 - aiogram.dispatcher - WARNING - Received SIGTERM signal
+2026-08-18 20:54:45,609 - aiogram.dispatcher - INFO - Polling stopped for bot @constestim_bot id=8967391567 - 'constestim_bot'
+2026-08-18 20:54:45,609 - aiogram.dispatcher - INFO - Polling stopped
