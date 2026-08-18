@@ -9,7 +9,6 @@ __pycache__/
 .venv/
 venv/
 env/
-requirements.txt.bak
 
 # Logs
 *.log
@@ -19,24 +18,14 @@ requirements.txt.bak
 .env.local
 *.env.*
 
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# IDE
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Build
-build/
+# Build artifacts
 dist/
+build/
 *.egg-info/
 ```
