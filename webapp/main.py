@@ -33,12 +33,30 @@ async def upload_file(file: UploadFile = File(...)):
     Поддерживает кириллицу в названиях колонок и содержимом.
     Если файл содержит несколько листов, возвращается ZIP-архив.
     """
-    if not file.filename.endswith(('.xlsx', '.xls')):
+    # Проверяем расширение файла (для совместимости)
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Файл должен быть в формате .xlsx или .xls")
 
     try:
         # Читаем файл в память (BytesIO)
         contents = await file.read()
+        
+        # Проверяем сигнатуру файла для определения реального формата
+        # .xlsx (Office Open XML) начинается с PK (504b0304)
+        # .xls (BIFF8) начинается с d0cf11e0a1b11ae1
+        if len(contents) < 8:
+            raise HTTPException(status_code=400, detail="Файл слишком мал или поврежден")
+        
+        header = contents[:8]
+        is_xls = header.startswith(b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1')
+        is_xlsx = header.startswith(b'PK\x03\x04')
+        
+        if not is_xls and not is_xlsx:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Неподдерживаемый формат файла. Ожидался .xls или .xlsx, но файл не является корректным Excel файлом."
+            )
+        
         file_stream = io.BytesIO(contents)
         
         # Обрабатываем файл через функцию парсинга напрямую из потока
