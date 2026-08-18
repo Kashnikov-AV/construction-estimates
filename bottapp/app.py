@@ -27,7 +27,11 @@ os.environ["HTTP_PROXY"] = PROXY_URL
 
 dp = Dispatcher()
 api_server = TelegramAPIServer.from_base(PROXY_URL)
-session = AiohttpSession(api=api_server, timeout=120)
+# Увеличенные таймауты для сессии: connect=30s, read=120s, write=120s, pool=60s
+session = AiohttpSession(
+    api=api_server,
+    timeout=ClientTimeout(total=300, connect=30, sock_read=120, sock_connect=30)
+)
 bot = Bot(token=BOT_TOKEN, session=session)
 
 # Настройка логирования
@@ -97,18 +101,30 @@ async def handle_document(message: types.Message) -> None:
     logger.info(f"Получен файл от пользователя {message.from_user.id}: {file_name}")
 
     try:
-        # Скачиваем файл
-        file = await bot.get_file(document.file_id)
-        file_bytes = await bot.download_file(file.file_path)
-        file_content = file_bytes.read()
+        # Асинхронная загрузка файла с явным указанием таймаута
+        file = await bot.get_file(document.file_id, timeout=300)
+        
+        # Создаем временный файл для асинхронной загрузки больших файлов
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp_file:
+            tmp_path = tmp_file.name
+            # Асинхронное скачивание файла напрямую во временный файл
+            await bot.download_file(file.file_path, destination=tmp_file, timeout=300)
+        
+        logger.info(f"Файл {file_name} загружен во временное хранилище: {tmp_path}")
 
+        # Читаем файл асинхронно
+        loop = asyncio.get_event_loop()
+        file_content = await loop.run_in_executor(None, lambda: open(tmp_path, 'rb').read())
+        
+        # Удаляем временный файл
+        os.unlink(tmp_path)
+        
+        file_stream = io.BytesIO(file_content)
         logger.info(f"Файл {file_name} загружен, размер: {len(file_content)} байт")
 
-        # Создаем BytesIO объект для передачи в core.parse_estimate
-        file_stream = io.BytesIO(file_content)
-
-        # Парсим смету с помощью функции из core
-        dfs = core_parse_estimate(file_stream)
+        # Парсим смету с помощью функции из core (запускаем в executor для неблокирующего выполнения)
+        dfs = await loop.run_in_executor(None, core_parse_estimate, file_stream)
 
         if not dfs:
             await processing_msg.edit_text("❌ Не удалось извлечь данные из сметы. Проверьте формат файла.")
@@ -119,7 +135,7 @@ async def handle_document(message: types.Message) -> None:
 
         # Экспортируем в CSV с помощью функции из core
         base_filename = os.path.splitext(file_name)[0]
-        result_content = export_estimates_to_csv(dfs, base_filename)
+        result_content = await loop.run_in_executor(None, export_estimates_to_csv, dfs, base_filename)
 
         # Формируем имя выходного файла
         if len(dfs) == 1:
