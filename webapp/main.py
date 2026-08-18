@@ -85,8 +85,11 @@ async def upload_file(file: UploadFile = File(...)):
         # Используем quote с safe='' чтобы закодировать все спецсимволы
         encoded_filename = urllib.parse.quote(output_filename, safe='')
         
+        # Создаем ASCII-версию имени для старых браузеров (заменяем кириллицу на транслит или underscore)
+        ascii_filename = output_filename.encode('ascii', 'replace').decode('ascii').replace('?', '_')
+        
         headers = {
-            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+            "Content-Disposition": f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}",
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
         
