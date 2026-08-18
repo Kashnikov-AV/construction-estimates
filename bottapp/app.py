@@ -6,7 +6,6 @@ import traceback
 import tempfile
 from typing import Any, Dict
 
-from aiohttp import ClientTimeout
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import BufferedInputFile
@@ -38,9 +37,10 @@ logger = logging.getLogger(__name__)
 
 # Увеличенные таймауты для сессии: total=300s, connect=30s, read=120s, write=120s
 api_server = TelegramAPIServer.from_base(PROXY_URL)
+# Передаем timeout как число (в секундах), а не как ClientTimeout
 session = AiohttpSession(
     api=api_server,
-    timeout=ClientTimeout(total=300, connect=30, sock_read=120, sock_connect=30)
+    timeout=300  # Таймаут в секундах
 )
 bot = Bot(token=BOT_TOKEN, session=session)
 storage = MemoryStorage()
@@ -285,8 +285,8 @@ dp.include_router(estimate_dialog)
 
 if __name__ == "__main__":
     try:
-        # Запускаем polling без явного указания poll_timeout
-        # Таймаут будет взят из настроек сессии (total=300s)
-        asyncio.run(dp.start_polling(bot, allowed_updates=["message", "callback_query"]))
+        # Запускаем polling с явным указанием polling_timeout=300 секунд
+        # Это совместимо с ClientTimeout(total=300) в сессии
+        asyncio.run(dp.start_polling(bot, polling_timeout=300, allowed_updates=["message", "callback_query"]))
     except KeyboardInterrupt:
         print("Бот остановлен.")
