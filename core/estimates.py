@@ -61,11 +61,16 @@ def parse_estimate(file_input: Union[str, io.BytesIO], **kwargs: Any) -> List[pd
         header = file_input.read(8)
         file_input.seek(file_pos)
         
-        # Проверяем сигнатуру файла: xls начинается с D0 CF 11 E0 A1 B1 1A E1
+        # Проверяем сигнатуру файла:
+        # .xls (BIFF8) начинается с D0 CF 11 E0 A1 B1 1A E1
+        # .xlsx (Office Open XML) начинается с PK (50 4B 03 04)
         if header.startswith(b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'):
             xf = pd.ExcelFile(file_input, engine='xlrd')
-        else:
+        elif header.startswith(b'PK\x03\x04'):
             xf = pd.ExcelFile(file_input, engine='openpyxl')
+        else:
+            # Пытаемся автоматически определить движок (pandas попробует угадать)
+            xf = pd.ExcelFile(file_input)
     
     out = []
     for sh in xf.sheet_names:
