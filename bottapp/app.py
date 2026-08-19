@@ -30,7 +30,7 @@ api_server = TelegramAPIServer.from_base(PROXY_URL)
 # Увеличенные таймауты для сессии: connect=30s, read=120s, write=120s, pool=60s
 session = AiohttpSession(
     api=api_server,
-    timeout=ClientTimeout(total=300, connect=30, sock_read=120, sock_connect=30)
+    timeout=60
 )
 bot = Bot(token=BOT_TOKEN, session=session)
 
@@ -114,7 +114,7 @@ async def handle_document(message: types.Message) -> None:
 
     try:
         # Асинхронная загрузка файла с явным указанием таймаута
-        file = await bot.get_file(document.file_id, timeout=300)
+        file = await bot.get_file(document.file_id, request_timeout=300)
         
         # Создаем временный файл для асинхронной загрузки больших файлов
         import tempfile
