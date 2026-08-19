@@ -151,10 +151,10 @@ async def handle_document(message: types.Message) -> None:
 
         # Формируем имя выходного файла
         if len(dfs) == 1:
-            output_filename = f"{base_filename}_очищенная.csv"
+            output_filename = f"{base_filename}.csv"
             caption = f"✅ Смета успешно очищена!\n\n📊 Листов обработано: {len(dfs)}\n📝 Строк данных: {len(dfs[0])}"
         else:
-            output_filename = f"{base_filename}_очищенная.zip"
+            output_filename = f"{base_filename}.zip"
             caption = f"✅ Смета успешно очищена!\n\n📊 Листов обработано: {len(dfs)}\n📦 Файлы упакованы в ZIP архив"
 
         # Отправляем результат
