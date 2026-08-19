@@ -118,7 +118,7 @@ def export_estimates_to_csv(dfs: List[pd.DataFrame], base_filename: str) -> byte
     if len(dfs) == 1:
         df = dfs[0]
         csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
+        df.to_csv(csv_buffer, index=False, sep=',', encoding='utf-8-sig')
         return csv_buffer.getvalue().encode('utf-8-sig')
     
     # Если несколько листов, упаковываем в ZIP
@@ -132,7 +132,7 @@ def export_estimates_to_csv(dfs: List[pd.DataFrame], base_filename: str) -> byte
             csv_filename = f"{base_filename}_{safe_sheet_name}.csv"
             
             csv_buffer = io.StringIO()
-            df.to_csv(csv_buffer, index=False, sep=';', encoding='utf-8-sig')
+            df.to_csv(csv_buffer, index=False, sep=',', encoding='utf-8-sig')
             csv_content = csv_buffer.getvalue().encode('utf-8-sig')
             
             zip_file.writestr(csv_filename, csv_content)
