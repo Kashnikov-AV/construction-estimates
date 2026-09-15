@@ -58,17 +58,17 @@ logger = logging.getLogger(__name__)
 async def command_start_handler(message: types.Message) -> None:
     """Обработчик команды /start"""
     await message.answer(
-        "👋 **Привет! Я бот для очистки строительных смет.**\n\n"
-        "📋 **Что я умею:**\n"
+        "👋 Привет! Я бот для очистки строительных смет.\n\n"
+        "📋 Что я умею:\n"
         "• Автоматически определять формат сметы (.xls или .xlsx)\n"
         "• Извлекать данные из таблиц с любым расположением колонок\n"
         "• Очищать данные от лишних строк и форматирования\n"
         "• Экспортировать результат в удобный CSV формат\n\n"
-        "📄 **Как использовать:**\n"
+        "📄 Как использовать:\n"
         "1. Отправьте мне файл локальной сметы в формате `.xls` или `.xlsx`\n"
         "2. Я обработаю файл и извлеку все данные\n"
         "3. Вы получите очищенный CSV файл (или ZIP при нескольких листах)\n\n"
-        "🔧 **Команды:**\n"
+        "🔧 Команды:\n"
         "/help - подробная справка\n"
         "/status - проверка работоспособности"
     )
@@ -78,16 +78,16 @@ async def command_start_handler(message: types.Message) -> None:
 async def command_help_handler(message: types.Message) -> None:
     """Обработчик команды /help"""
     await message.answer(
-        "ℹ️ **Справка по боту**\n\n"
+        "ℹ️ Справка по боту\n\n"
         "Я умею:\n"
         "• Обрабатывать сметы в форматах .xls и .xlsx\n"
         "• Извлекать данные из таблиц смет\n"
         "• Экспортировать результаты в CSV формат\n\n"
-        "📤 **Как использовать:**\n"
+        "📤 Как использовать:\n"
         "1. Отправьте мне файл сметы\n"
         "2. Дождитесь обработки\n"
         "3. Получите готовый CSV файл\n\n"
-        "⚠️ **Важно:**\n"
+        "⚠️ Важно:\n"
         "• Максимальный размер файла: 20 МБ\n"
         "• Поддерживаются форматы .xls и .xlsx"
     )
@@ -109,7 +109,7 @@ async def handle_document(message: types.Message) -> None:
     valid_extensions = ('.xls', '.xlsx')
     if not any(file_name.lower().endswith(ext) for ext in valid_extensions):
         await message.answer(
-            f"⚠️ Пожалуйста, загрузите файл в одном из поддерживаемых форматов: **{', '.join(valid_extensions)}**"
+            f"⚠️ Пожалуйста, загрузите файл в одном из поддерживаемых форматов: {', '.join(valid_extensions)}"
         )
         return
 
@@ -119,7 +119,7 @@ async def handle_document(message: types.Message) -> None:
         return
 
     processing_msg = await message.answer(
-        "⏳ **Файл получен!**\n\n"
+        "⏳ Файл получен!\n\n"
         f"📁 Имя файла: `{file_name}`\n"
         "🔄 Начинаю загрузку и обработку...\n\n"
         "Это может занять несколько секунд в зависимости от размера файла."
@@ -182,12 +182,12 @@ async def handle_document(message: types.Message) -> None:
             })
 
         # Формируем сообщение с суммами
-        summary_message = "📊 **Сводка по смете:**\n\n"
+        summary_message = "📊 Сводка по смете:\n\n"
         for info in totals_info:
-            summary_message += f"📄 **{info['sheet']}**:\n"
-            summary_message += f"   🔹 Материалы: {info['materials_count']} поз. на сумму **{info['materials_total']:,.2f} руб.**\n"
-            summary_message += f"   🔹 Работы: {info['works_count']} поз. на сумму **{info['works_total']:,.2f} руб.**\n"
-            summary_message += f"   💰 **Итого: {info['materials_total'] + info['works_total']:,.2f} руб.**\n\n"
+            summary_message += f"📄 {info['sheet']}:\n"
+            summary_message += f"   🔹 Материалы: {info['materials_count']} поз. на сумму {info['materials_total']:,.2f} руб.\n"
+            summary_message += f"   🔹 Работы: {info['works_count']} поз. на сумму {info['works_total']:,.2f} руб.\n"
+            summary_message += f"   💰 Итого: {info['materials_total'] + info['works_total']:,.2f} руб.\n\n"
 
         # Отправляем сообщение с суммами
         await message.answer(summary_message)
@@ -218,8 +218,8 @@ async def handle_document(message: types.Message) -> None:
         logger.error(f"Ошибка при обработке файла {file_name}: {e}\n{error_trace}")
         await processing_msg.edit_text(
             f"❌ Произошла ошибка при обработке файла.\n\n"
-            f"**Тип ошибки:** {type(e).__name__}\n"
-            f"**Сообщение:** {str(e)}\n\n"
+            f"Тип ошибки: {type(e).__name__}\n"
+            f"Сообщение: {str(e)}\n\n"
             f"Попробуйте отправить файл другого формата или обратитесь к разработчику."
         )
 
