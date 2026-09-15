@@ -10,6 +10,10 @@ import zipfile
 import io
 import os
 from typing import Optional, Any, List, Union
+from core.config_keywords import (
+    WORK_KEYWORDS, MATERIAL_KEYWORDS, WORK_UNITS, PHYSICAL_UNITS,
+    LABOR_UNITS, HEADER_PATTERNS, VERB_PATTERNS, MATERIAL_OVERRIDE, TECHNICAL_PATTERNS
+)
 
 
 KEYS = ["№ п/п", "Обоснование", "Наименование работ и затрат"]
@@ -140,56 +144,24 @@ def export_estimates_to_csv(dfs: List[pd.DataFrame], base_filename: str) -> byte
     return zip_buffer.getvalue()
 
 
-# Ключевые слова для классификации работ (глаголы и процессы)
-WORK_KEYWORDS = [
-    'монтаж', 'демонтаж', 'установка', 'устройство', 'укладка', 'окраска', 'сварка',
-    'очистка', 'погрузка', 'разгрузка', 'разборка', 'снятие', 'прокладка', 'крепление',
-    'испытание', 'наладка', 'регулировка', 'проверка', 'контроль', 'измерение',
-    'подготовка', 'грунтовка', 'шпатлевка', 'штукатурка', 'бетонирование', 'армирование',
-    'герметизация', 'изоляция', 'утепление', 'облицовка', 'футеровка', 'антикоррозийная',
-    'огнезащита', 'маркировка', 'консервация', 'расконсервация', 'транспортирование',
-    'перемещение', 'подъем', 'опускание', 'центрировка', 'выверка', 'юстировка',
-    'опрессовка', 'продувка', 'промывка', 'дезинфекция', 'дегазация', 'обеззараживание'
-]
-
-# Ключевые слова для классификации материалов (существительные - ресурсы)
-MATERIAL_KEYWORDS = [
-    'бетон', 'раствор', 'смесь', 'цемент', 'песок', 'щебень', 'грунт', 'асфальт',
-    'кирпич', 'блок', 'панель', 'плита', 'балка', 'колонна', 'ферма', 'каркас',
-    'труба', 'трубопровод', 'кабель', 'провод', 'шина', 'арматура', 'сетка',
-    'профиль', 'уголок', 'швеллер', 'двутавр', 'лист', 'полоса', 'круг', 'квадрат',
-    'краска', 'лак', 'эмаль', 'грунтовка', 'шпатлевка', 'штукатурка', 'клей',
-    'герметик', 'мастика', 'изоляцион', 'утеплител', 'рубероид', 'толь', 'пергамин',
-    'стекло', 'зеркало', 'плинтус', 'наличник', 'дверь', 'ворота', 'калитка',
-    'окно', 'витраж', 'люк', 'решетка', 'ограждение', 'забор', 'ворота',
-    'лампа', 'светильник', 'прожектор', 'трансформатор', 'генератор', 'двигатель',
-    'насос', 'вентилятор', 'компрессор', 'котел', 'бойлер', 'радиатор', 'конвектор',
-    'шкаф', 'щит', 'панель', 'пульт', 'прибор', 'датчик', 'сенсор', 'счетчик',
-    'задвижка', 'клапан', 'кран', 'вентиль', 'фильтр', 'редуктор', 'муфта',
-    'болт', 'гайка', 'винт', 'шуруп', 'саморез', 'заклепка', 'дюбель', 'анкер',
-    'электрод', 'проволока', 'лента', 'скотч', 'изолента', 'термоусадка',
-    'бензин', 'дизель', 'керосин', 'масло', 'смазка', 'топливо', 'электроэнергия'
-]
-
-# Единицы измерения, характерные для работ (укрупненные)
-WORK_UNITS = [
-    '100 м2', '100 м3', '100 м', '100 шт', '10 м2', '10 м3', '10 м', '10 шт',
-    '1000 шт', '10 компл', '100 отверстий', '100 соединений', '100 м ступеней',
-    'чел.-ч', 'маш.-ч', '%', 'компл'
-]
 
 
 def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
     """
     Классифицирует позиции сметы на работы/услуги и материалы.
     
-    Алгоритм классификации:
+    Алгоритм классификации (приоритетный порядок):
     1. Единицы измерения труда (чел.-ч, маш.-ч) — работа
     2. Укрупнённые единицы (100 м2, 10 шт и т.п.) — работа
     3. Проценты (%) — накладные расходы/сметная прибыль (не материал)
-    4. Ключевые слова-процессы в наименовании — работа
-    5. Ключевые слова-материалы в наименовании — материал
-    6. Физические единицы без маркеров — требует проверки по наименованию
+    4. Проверка на заголовки/итоги по HEADER_PATTERNS
+    5. Технические расчеты и объемы (TECHNICAL_PATTERNS) — Заголовок/Итог
+    6. Ключевые слова-процессы в наименовании из WORK_KEYWORDS — работа
+    7. Ключевые слова-материалы из MATERIAL_KEYWORDS — материал
+    8. Глагольные формы из VERB_PATTERNS — работа
+    9. MATERIAL_OVERRIDE — приоритет материала даже при наличии глаголов
+    10. Физические единицы без маркеров — предположительно материал
+    11. Всё остальное — требует уточнения
     
     Args:
         df: DataFrame с данными сметы (колонки: "Наименование", "Ед.изм.")
@@ -199,7 +171,7 @@ def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
         - "Работа" — работы и услуги
         - "Материал" — материальные ресурсы
         - "НР/СП" — накладные расходы и сметная прибыль
-        - "Заголовок/Итог" — служебные строки
+        - "Заголовок/Итог" — служебные строки и технические расчеты
         - "Требует уточнения" — сложные случаи
     """
     result_df = df.copy()
@@ -215,12 +187,12 @@ def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
             continue
         
         # 1. Единицы измерения труда — работа
-        if unit in ['чел.-ч', 'маш.-ч']:
+        if unit in LABOR_UNITS:
             categories.append("Работа")
             continue
         
         # 2. Укрупнённые единицы — работа
-        is_work_unit = any(wu in unit for wu in WORK_UNITS if wu not in ['чел.-ч', 'маш.-ч', '%', 'компл'])
+        is_work_unit = any(wu in unit for wu in WORK_UNITS if wu not in LABOR_UNITS + ['%', 'компл', 'комплект'])
         if is_work_unit:
             categories.append("Работа")
             continue
@@ -230,43 +202,54 @@ def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
             categories.append("НР/СП")
             continue
         
-        # 4. Проверка ключевых слов-процессов (работы)
+        # 4. Проверка на заголовки/итоги по HEADER_PATTERNS
+        is_header = any(pattern in name for pattern in HEADER_PATTERNS)
+        if is_header:
+            categories.append("Заголовок/Итог")
+            continue
+        
+        # 5. Технические расчеты и объемы (TECHNICAL_PATTERNS) — Заголовок/Итог
+        is_technical = any(name.startswith(pattern.rstrip(':')) for pattern in TECHNICAL_PATTERNS if pattern.endswith(':'))
+        is_technical = is_technical or any(pattern in name for pattern in TECHNICAL_PATTERNS if not pattern.endswith(':'))
+        # Дополнительно проверяем паттерны с двоеточием в конце как startswith
+        for pattern in TECHNICAL_PATTERNS:
+            if pattern.endswith(':'):
+                clean_pattern = pattern.lstrip('^').rstrip(':')
+                if name.startswith(clean_pattern):
+                    is_technical = True
+                    break
+        if is_technical:
+            categories.append("Заголовок/Итог")
+            continue
+        
+        # 6. Проверка ключевых слов-процессов (работы) из WORK_KEYWORDS
         is_work = any(kw in name for kw in WORK_KEYWORDS)
         if is_work:
             categories.append("Работа")
             continue
         
-        # 5. Проверка ключевых слов-материалов
+        # 7. Проверка ключевых слов-материалов из MATERIAL_KEYWORDS
         is_material = any(kw in name for kw in MATERIAL_KEYWORDS)
         if is_material:
             categories.append("Материал")
             continue
         
-        # 6. Физические единицы без явных маркеров — требует уточнения
-        # Но если есть глагол в любой форме — это работа
-        has_verb_pattern = any(verb in name for verb in [
-            'устройств', 'монтаж', 'демонтаж', 'установк', 'укладк', 'окраск',
-            'сварк', 'очистк', 'погрузк', 'разгрузк', 'разборк', 'снят', 'прокладк',
-            'креплен', 'испытан', 'налаж', 'регулировк', 'проверк', 'измерен',
-            'подготовк', 'грунтовк', 'шпатлевк', 'штукатурк', 'бетонирован', 'армирован',
-            'герметиз', 'изолирован', 'утеплен', 'облицовк', 'футеровк', 'антикорроз',
-            'огнезащит', 'маркировк', 'консервац', 'расконсервац', 'транспортирован',
-            'перемещен', 'подъем', 'опускан', 'центрировк', 'выверк', 'юстировк',
-            'опрессовк', 'продувк', 'промывк', 'дезинфекц', 'дегазац', 'обеззараживан'
-        ])
-        
+        # 8. Проверка глагольных форм из VERB_PATTERNS — работа
+        has_verb_pattern = any(verb in name for verb in VERB_PATTERNS)
         if has_verb_pattern:
             categories.append("Работа")
             continue
         
-        # Если единица измерения физическая (шт, м, м2, кг, т и т.д.)
-        physical_units = ['шт', 'м', 'м2', 'м3', 'кг', 'т', 'л', 'кВт·ч', 'кВт-ч']
-        if any(pu in unit for pu in physical_units):
+        # 9. MATERIAL_OVERRIDE — приоритет материала даже при наличии глаголов
+        # (уже проверено выше, но оставляем для будущих расширений)
+        
+        # 10. Если единица измерения физическая (шт, м, м2, кг, т и т.д.)
+        if any(pu in unit for pu in PHYSICAL_UNITS):
             # По умолчанию считаем материалом, если нет признаков работы
             categories.append("Материал (предпол.)")
             continue
         
-        # Все остальные случаи
+        # 11. Все остальные случаи
         categories.append("Требует уточнения")
     
     result_df['Категория'] = categories
@@ -379,13 +362,14 @@ def calculate_totals_by_category(df: pd.DataFrame) -> dict:
     }
 
 
-def export_estimate_to_excel(dfs: List[pd.DataFrame], base_filename: str) -> tuple[bytes, str]:
+
+def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
     """
     Экспорт сметы в Excel файл с двумя листами: Материалы и Работы.
     Если несколько листов в исходной смете, они объединяются в один Excel файл.
     
     Args:
-        dfs: Список DataFrame с данными сметы
+        dfs: Список кортежей (имя_листа, DataFrame) с данными сметы
         base_filename: Базовое имя для файлов
     
     Returns:
@@ -394,9 +378,15 @@ def export_estimate_to_excel(dfs: List[pd.DataFrame], base_filename: str) -> tup
     excel_buffer = io.BytesIO()
     
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        for i, df in enumerate(dfs):
-            original_sheet_name = df.attrs.get("sheet", f"sheet_{i+1}")
-            safe_sheet_name = re.sub(r'[<>:"/\|?*]', '', original_sheet_name)
+        for i, item in enumerate(dfs):
+            # Поддерживаем как список кортежей (имя, df), так и список DataFrame
+            if isinstance(item, tuple) and len(item) == 2:
+                original_sheet_name, df = item
+            else:
+                df = item
+                original_sheet_name = getattr(df, 'attrs', {}).get("sheet", f"sheet_{i+1}")
+            
+            safe_sheet_name = re.sub(r'[<>:"/\\|?*]', '', str(original_sheet_name))
             
             # Разделяем на материалы и работы
             materials_df, works_df = split_estimate_to_materials_and_works(df)
