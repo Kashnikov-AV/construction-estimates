@@ -504,6 +504,6 @@ def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
                 )
     
     excel_content = excel_buffer.getvalue()
-    excel_filename = f"{base_filename}_разделение.xlsx"
+    excel_filename = f"{base_filename}_clear.xlsx"
     
     return excel_content, excel_filename
