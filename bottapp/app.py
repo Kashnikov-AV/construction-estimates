@@ -24,7 +24,8 @@ from core.estimates import (
     parse_estimate as core_parse_estimate,
     export_estimates_to_csv,
     calculate_totals_by_category,
-    export_estimate_to_excel
+    export_estimate_to_excel,
+    delete_duplicates
 )
 
 # Получаем секретные данные из переменных окружения
@@ -158,6 +159,15 @@ async def handle_document(message: types.Message) -> None:
 
         logger.info(f"Успешно распарсено {len(dfs)} листов из файла {file_name}")
 
+        # Применяем очистку от дубликатов к каждому листу
+        dfs_cleaned = []
+        for i, df in enumerate(dfs):
+            df_cleaned = await loop.run_in_executor(None, delete_duplicates, df)
+            dfs_cleaned.append(df_cleaned)
+        
+        # Используем очищенные DataFrame для дальнейшей обработки
+        dfs = dfs_cleaned
+        
         # Вычисляем суммы по материалам и работам для каждого листа
         totals_info = []
         for i, df in enumerate(dfs):

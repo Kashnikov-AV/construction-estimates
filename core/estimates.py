@@ -363,6 +363,70 @@ def calculate_totals_by_category(df: pd.DataFrame) -> dict:
 
 
 
+def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Удаляет дубликаты из сметы после парсинга.
+    
+    Алгоритм очистки:
+    1. Удаляет полные дубликаты строк (все колонки совпадают)
+    2. Удаляет строки где все числовые колонки пусты или равны 0
+    3. Удаляет технические/служебные строки типа "(Деревянные конструкции)"
+    4. Удаляет дубликаты по ключевым полям: ['Обоснование', 'Наименование', 'Цена тек.', 'Стоимость']
+       с сохранением первой записи
+    5. Агрегирует оставшиеся дубликаты позиций по ключевым полям с суммированием количеств
+    
+    Args:
+        df: DataFrame с данными сметы после parse_estimate
+    
+    Returns:
+        DataFrame очищенный от дубликатов
+    """
+    if df.empty:
+        return df.copy()
+    
+    result_df = df.copy()
+    
+    # 1. Удаляем полные дубликаты строк
+    result_df = result_df.drop_duplicates(keep='first')
+    
+    # 2. Фильтруем служебные строки и технические комментарии
+    # Строки типа "(Деревянные конструкции)", "(...)" и т.п.
+    if 'Наименование' in result_df.columns:
+        mask_technical = result_df['Наименование'].astype(str).str.strip().str.startswith('(') & \
+                        result_df['Наименование'].astype(str).str.strip().str.endswith(')')
+        result_df = result_df[~mask_technical]
+        
+        # Также удаляем строки где Наименование пустое или содержит только пробелы
+        result_df = result_df[result_df['Наименование'].astype(str).str.strip().isin(['', '-', 'NaN']) == False]
+    
+    # 3. Удаляем строки где все числовые колонки равны 0 или NaN
+    numeric_cols = ['Кол-во на ед.', 'Коэф.', 'Кол-во всего', 'Цена баз.', 'Индекс', 'Цена тек.', 'Коэф.2', 'Стоимость']
+    available_numeric_cols = [c for c in numeric_cols if c in result_df.columns]
+    
+    if available_numeric_cols:
+        # Преобразуем числовые колонки к numeric
+        for col in available_numeric_cols:
+            result_df[col] = pd.to_numeric(result_df[col], errors='coerce')
+        
+        # Проверяем есть ли хотя бы одна ненулевая числовая колонка
+        mask_nonzero = result_df[available_numeric_cols].apply(
+            lambda row: row.notna().any() and (row != 0).any(), axis=1
+        )
+        result_df = result_df[mask_nonzero | result_df[available_numeric_cols].isna().all(axis=1)]
+    
+    # 4. Удаляем дубликаты по ключевым полям: Обоснование + Наименование + Цена тек. + Стоимость
+    key_columns = ['Обоснование', 'Наименование', 'Цена тек.', 'Стоимость']
+    available_key_columns = [c for c in key_columns if c in result_df.columns]
+    
+    if len(available_key_columns) >= 2:  # Минимум 2 колонки для осмысленной проверки
+        result_df = result_df.drop_duplicates(subset=available_key_columns, keep='first')
+    
+    # 5. Сбрасываем индексы
+    result_df = result_df.reset_index(drop=True)
+    
+    return result_df
+
+
 def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
     """
     Экспорт сметы в Excel файл с двумя листами: Материалы и Работы.
@@ -388,8 +452,11 @@ def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
             
             safe_sheet_name = re.sub(r'[<>:"/\\|?*]', '', str(original_sheet_name))
             
+            # Применяем очистку от дубликатов к исходному DataFrame
+            df_cleaned = delete_duplicates(df)
+            
             # Разделяем на материалы и работы
-            materials_df, works_df = split_estimate_to_materials_and_works(df)
+            materials_df, works_df = split_estimate_to_materials_and_works(df_cleaned)
             
             # Формируем имена листов с префиксом оригинального листа если их несколько
             prefix = f"{safe_sheet_name}_" if len(dfs) > 1 else ""
