@@ -16,7 +16,12 @@ from aiogram.exceptions import TelegramNetworkError
 # Импорт бизнес-логики из core
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.estimates import parse_estimate as core_parse_estimate, export_estimates_to_csv
+from core.estimates import (
+    parse_estimate as core_parse_estimate,
+    export_estimates_to_csv,
+    calculate_totals_by_category,
+    export_estimate_to_excel
+)
 
 BOT_TOKEN = "8967391567:AAHa6VD74hzBiZhvvP3g62TiV0wZa5eLgxU"
 PROXY_URL = "https://gentle-tree-1a2f.fln5kqj50.workers.dev"
@@ -145,25 +150,45 @@ async def handle_document(message: types.Message) -> None:
 
         logger.info(f"Успешно распарсено {len(dfs)} листов из файла {file_name}")
 
-        # Экспортируем в CSV с помощью функции из core
+        # Вычисляем суммы по материалам и работам для каждого листа
+        totals_info = []
+        for i, df in enumerate(dfs):
+            sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
+            totals = await loop.run_in_executor(None, calculate_totals_by_category, df)
+            totals_info.append({
+                'sheet': sheet_name,
+                'materials_total': totals['materials_total'],
+                'works_total': totals['works_total'],
+                'materials_count': totals['materials_count'],
+                'works_count': totals['works_count']
+            })
+
+        # Формируем сообщение с суммами
+        summary_message = "📊 **Сводка по смете:**\n\n"
+        for info in totals_info:
+            summary_message += f"📄 **{info['sheet']}**:\n"
+            summary_message += f"   🔹 Материалы: {info['materials_count']} поз. на сумму **{info['materials_total']:,.2f} руб.**\n"
+            summary_message += f"   🔹 Работы: {info['works_count']} поз. на сумму **{info['works_total']:,.2f} руб.**\n"
+            summary_message += f"   💰 **Итого: {info['materials_total'] + info['works_total']:,.2f} руб.**\n\n"
+
+        # Отправляем сообщение с суммами
+        await message.answer(summary_message)
+
+        # Экспортируем в Excel с разделением на материалы и работы
         base_filename = os.path.splitext(file_name)[0]
-        result_content = await loop.run_in_executor(None, export_estimates_to_csv, dfs, base_filename)
+        excel_content, output_filename = await loop.run_in_executor(None, export_estimate_to_excel, dfs, base_filename)
 
-        # Формируем имя выходного файла
-        if len(dfs) == 1:
-            output_filename = f"{base_filename}.csv"
-            caption = f"✅ Смета успешно очищена!\n\n📊 Листов обработано: {len(dfs)}\n📝 Строк данных: {len(dfs[0])}"
-        else:
-            output_filename = f"{base_filename}.zip"
-            caption = f"✅ Смета успешно очищена!\n\n📊 Листов обработано: {len(dfs)}\n📦 Файлы упакованы в ZIP архив"
+        caption = "✅ Excel файл с разделением на Материалы и Работы готов!"
 
-        # Отправляем результат
+        # Отправляем Excel файл
         await message.answer_document(
-            document=BufferedInputFile(result_content, filename=output_filename),
+            document=BufferedInputFile(excel_content, filename=output_filename),
             caption=caption
         )
+        
         await processing_msg.delete()
         logger.info(f"Файл {output_filename} отправлен пользователю {message.from_user.id}")
+
 
     except asyncio.TimeoutError:
         logger.error(f"Timeout при загрузке файла {file_name} от пользователя {message.from_user.id}")

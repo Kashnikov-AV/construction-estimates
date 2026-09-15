@@ -326,3 +326,105 @@ def get_estimate_summary(df: pd.DataFrame) -> dict:
     summary['Всего позиций'] = len(df)
     
     return summary
+
+
+def split_estimate_to_materials_and_works(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Разделяет смету на две таблицы: материалы и работы.
+    
+    Args:
+        df: DataFrame с данными сметы
+    
+    Returns:
+        Кортеж из двух DataFrame: (materials_df, works_df)
+    """
+    classified_df = classify_estimate_items(df)
+    
+    # Фильтруем материалы
+    materials_df = filter_estimate_by_category(classified_df, "Материал")
+    
+    # Фильтруем работы
+    works_df = filter_estimate_by_category(classified_df, "Работа")
+    
+    return materials_df, works_df
+
+
+def calculate_totals_by_category(df: pd.DataFrame) -> dict:
+    """
+    Вычисляет суммы по категориям (материалы и работы).
+    
+    Args:
+        df: DataFrame с данными сметы
+    
+    Returns:
+        Словарь с суммами: {'materials_total': float, 'works_total': float}
+    """
+    classified_df = classify_estimate_items(df)
+    
+    materials_df = filter_estimate_by_category(classified_df, "Материал")
+    works_df = filter_estimate_by_category(classified_df, "Работа")
+    
+    # Преобразуем колонку "Стоимость" в числовой формат
+    def safe_to_numeric(series):
+        return pd.to_numeric(series, errors='coerce').fillna(0)
+    
+    materials_total = safe_to_numeric(materials_df['Стоимость']).sum() if not materials_df.empty else 0
+    works_total = safe_to_numeric(works_df['Стоимость']).sum() if not works_df.empty else 0
+    
+    return {
+        'materials_total': materials_total,
+        'works_total': works_total,
+        'materials_count': len(materials_df),
+        'works_count': len(works_df)
+    }
+
+
+def export_estimate_to_excel(dfs: List[pd.DataFrame], base_filename: str) -> tuple[bytes, str]:
+    """
+    Экспорт сметы в Excel файл с двумя листами: Материалы и Работы.
+    Если несколько листов в исходной смете, они объединяются в один Excel файл.
+    
+    Args:
+        dfs: Список DataFrame с данными сметы
+        base_filename: Базовое имя для файлов
+    
+    Returns:
+        Кортеж из (байты Excel файла, имя файла)
+    """
+    excel_buffer = io.BytesIO()
+    
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        for i, df in enumerate(dfs):
+            original_sheet_name = df.attrs.get("sheet", f"sheet_{i+1}")
+            safe_sheet_name = re.sub(r'[<>:"/\|?*]', '', original_sheet_name)
+            
+            # Разделяем на материалы и работы
+            materials_df, works_df = split_estimate_to_materials_and_works(df)
+            
+            # Формируем имена листов с префиксом оригинального листа если их несколько
+            prefix = f"{safe_sheet_name}_" if len(dfs) > 1 else ""
+            
+            # Лист 1: Материалы
+            materials_sheet_name = f"{prefix}Материалы"
+            if not materials_df.empty:
+                materials_df.to_excel(writer, sheet_name=materials_sheet_name[:31], index=False)
+            else:
+                # Создаем пустой лист если нет материалов
+                pd.DataFrame({'Наименование': ['Нет данных']}).to_excel(
+                    writer, sheet_name=materials_sheet_name[:31], index=False
+                )
+            
+            # Лист 2: Работы
+            works_sheet_name = f"{prefix}Работы"
+            if not works_df.empty:
+                works_df.to_excel(writer, sheet_name=works_sheet_name[:31], index=False)
+            else:
+                # Создаем пустой лист если нет работ
+                pd.DataFrame({'Наименование': ['Нет данных']}).to_excel(
+                    writer, sheet_name=works_sheet_name[:31], index=False
+                )
+    
+    excel_content = excel_buffer.getvalue()
+    excel_filename = f"{base_filename}_разделение.xlsx"
+    
+    return excel_content, excel_filename
