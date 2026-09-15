@@ -365,22 +365,22 @@ def calculate_totals_by_category(df: pd.DataFrame) -> dict:
 
 def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Удаляет дубликаты из сметы после парсинга.
+    Удаляет дубликаты и служебные строки из сметы после парсинга.
     
     Алгоритм очистки:
     1. Удаляет полные дубликаты строк (все колонки совпадают)
     2. Удаляет строки где все числовые колонки пусты или равны 0
     3. Удаляет технические/служебные строки типа "(Деревянные конструкции)"
-    4. Удаляет строки с "ОТ(ЗТ)" где поле "Стоимость" пустое (дублируют цену основной строки)
-    5. Удаляет дубликаты по ключевым полям: ['Обоснование', 'Наименование', 'Цена тек.', 'Стоимость']
+    4. Удаляет строки с пустым полем "Ед.изм." (заголовки, итоги, служебные строки без единиц измерения)
+    5. Удаляет строки с "ОТ(ЗТ)" где поле "Стоимость" пустое (дублируют цену основной строки)
+    6. Удаляет дубликаты по ключевым полям: ['Обоснование', 'Наименование', 'Цена тек.', 'Стоимость']
        с сохранением первой записи
-    6. Агрегирует оставшиеся дубликаты позиций по ключевым полям с суммированием количеств
     
     Args:
         df: DataFrame с данными сметы после parse_estimate
     
     Returns:
-        DataFrame очищенный от дубликатов
+        DataFrame очищенный от дубликатов и служебных строк
     """
     if df.empty:
         return df.copy()
@@ -415,10 +415,17 @@ def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         )
         result_df = result_df[mask_nonzero | result_df[available_numeric_cols].isna().all(axis=1)]
     
-    # 4. Удаляем строки с "ОТ(ЗТ)" где поле "Стоимость" пустое или NaN
+    # 4. Удаляем строки с пустым полем "Ед.изм." (заголовки, итоги, служебные строки)
+    if 'Ед.изм.' in result_df.columns:
+        # Считаем пустыми: NaN, пустую строку, '-', 'NaN'
+        mask_empty_unit = result_df['Ед.изм.'].astype(str).str.strip().isin(['', 'nan', 'NaN', '-', 'None']) | \
+                         result_df['Ед.изм.'].isna()
+        result_df = result_df[~mask_empty_unit]
+    
+    # 5. Удаляем строки с "ОТ(ЗТ)" где поле "Стоимость" пустое или NaN
     # Такие строки дублируют цену основной строки и не несут полезной информации
     if 'Наименование' in result_df.columns and 'Стоимость' in result_df.columns:
-        mask_ot_zt = result_df['Наименование'].astype(str).str.contains(r'ОТ\(ЗТ\)|ОТм\(ЗТм\)|ФОТ', regex=True, na=False)
+        mask_ot_zt = result_df['Наименование'].astype(str).str.contains(r'ОТ\(ЗТ\)', regex=True, na=False)
         mask_empty_cost = result_df['Стоимость'].astype(str).str.strip().isin(['', 'NaN', 'nan', '-']) | \
                          result_df['Стоимость'].isna()
         # Преобразуем Стоимость в numeric для проверки на 0
@@ -429,14 +436,14 @@ def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         mask_delete_ot = mask_ot_zt & mask_zero_cost
         result_df = result_df[~mask_delete_ot]
     
-    # 5. Удаляем дубликаты по ключевым полям: Обоснование + Наименование + Цена тек. + Стоимость
+    # 6. Удаляем дубликаты по ключевым полям: Обоснование + Наименование + Цена тек. + Стоимость
     key_columns = ['Обоснование', 'Наименование', 'Цена тек.', 'Стоимость']
     available_key_columns = [c for c in key_columns if c in result_df.columns]
     
     if len(available_key_columns) >= 2:  # Минимум 2 колонки для осмысленной проверки
         result_df = result_df.drop_duplicates(subset=available_key_columns, keep='first')
     
-    # 6. Сбрасываем индексы
+    # 7. Сбрасываем индексы
     result_df = result_df.reset_index(drop=True)
     
     return result_df
