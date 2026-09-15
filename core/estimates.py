@@ -433,7 +433,7 @@ def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         mask_zero_cost = cost_numeric.isna() | (cost_numeric == 0)
         
         # Удаляем строки где есть ОТ(ЗТ) И (Стоимость пустое ИЛИ Стоимость = 0)
-        mask_delete_ot = mask_ot_zt & mask_zero_cost
+        mask_delete_ot = mask_ot_zt | mask_zero_cost
         result_df = result_df[~mask_delete_ot]
     
     # 6. Удаляем дубликаты по ключевым полям: Обоснование + Наименование + Цена тек. + Стоимость
