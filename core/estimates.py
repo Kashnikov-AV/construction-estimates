@@ -362,13 +362,14 @@ def calculate_totals_by_category(df: pd.DataFrame) -> dict:
     }
 
 
-def export_estimate_to_excel(dfs: List[pd.DataFrame], base_filename: str) -> tuple[bytes, str]:
+
+def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
     """
     Экспорт сметы в Excel файл с двумя листами: Материалы и Работы.
     Если несколько листов в исходной смете, они объединяются в один Excel файл.
     
     Args:
-        dfs: Список DataFrame с данными сметы
+        dfs: Список кортежей (имя_листа, DataFrame) с данными сметы
         base_filename: Базовое имя для файлов
     
     Returns:
@@ -377,9 +378,15 @@ def export_estimate_to_excel(dfs: List[pd.DataFrame], base_filename: str) -> tup
     excel_buffer = io.BytesIO()
     
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        for i, df in enumerate(dfs):
-            original_sheet_name = df.attrs.get("sheet", f"sheet_{i+1}")
-            safe_sheet_name = re.sub(r'[<>:"/\|?*]', '', original_sheet_name)
+        for i, item in enumerate(dfs):
+            # Поддерживаем как список кортежей (имя, df), так и список DataFrame
+            if isinstance(item, tuple) and len(item) == 2:
+                original_sheet_name, df = item
+            else:
+                df = item
+                original_sheet_name = getattr(df, 'attrs', {}).get("sheet", f"sheet_{i+1}")
+            
+            safe_sheet_name = re.sub(r'[<>:"/\\|?*]', '', str(original_sheet_name))
             
             # Разделяем на материалы и работы
             materials_df, works_df = split_estimate_to_materials_and_works(df)
