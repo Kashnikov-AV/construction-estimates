@@ -191,24 +191,30 @@ def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
             categories.append("Работа")
             continue
         
-        # 2. Укрупнённые единицы — работа
+        # 2. Проверка ключевых слов-материалов из MATERIAL_KEYWORDS (приоритет над WORK_UNITS)
+        is_material = any(kw in name for kw in MATERIAL_KEYWORDS)
+        if is_material:
+            categories.append("Материал")
+            continue
+        
+        # 3. Укрупнённые единицы — работа
         is_work_unit = any(wu in unit for wu in WORK_UNITS if wu not in LABOR_UNITS + ['%', 'компл', 'комплект'])
         if is_work_unit:
             categories.append("Работа")
             continue
         
-        # 3. Проценты — накладные расходы/сметная прибыль
+        # 4. Проценты — накладные расходы/сметная прибыль
         if unit == '%' or 'накладные' in name or 'сметная прибыль' in name:
             categories.append("НР/СП")
             continue
         
-        # 4. Проверка на заголовки/итоги по HEADER_PATTERNS
+        # 5. Проверка на заголовки/итоги по HEADER_PATTERNS
         is_header = any(pattern in name for pattern in HEADER_PATTERNS)
         if is_header:
             categories.append("Заголовок/Итог")
             continue
         
-        # 5. Технические расчеты и объемы (TECHNICAL_PATTERNS) — Заголовок/Итог
+        # 6. Технические расчеты и объемы (TECHNICAL_PATTERNS) — Заголовок/Итог
         is_technical = any(name.startswith(pattern.rstrip(':')) for pattern in TECHNICAL_PATTERNS if pattern.endswith(':'))
         is_technical = is_technical or any(pattern in name for pattern in TECHNICAL_PATTERNS if not pattern.endswith(':'))
         # Дополнительно проверяем паттерны с двоеточием в конце как startswith
@@ -222,16 +228,10 @@ def classify_estimate_items(df: pd.DataFrame) -> pd.DataFrame:
             categories.append("Заголовок/Итог")
             continue
         
-        # 6. Проверка ключевых слов-процессов (работы) из WORK_KEYWORDS
+        # 7. Проверка ключевых слов-процессов (работы) из WORK_KEYWORDS
         is_work = any(kw in name for kw in WORK_KEYWORDS)
         if is_work:
             categories.append("Работа")
-            continue
-        
-        # 7. Проверка ключевых слов-материалов из MATERIAL_KEYWORDS
-        is_material = any(kw in name for kw in MATERIAL_KEYWORDS)
-        if is_material:
-            categories.append("Материал")
             continue
         
         # 8. Проверка глагольных форм из VERB_PATTERNS — работа
