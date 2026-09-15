@@ -4,6 +4,10 @@ import logging
 import asyncio
 import traceback
 import zipfile
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения из файла .env
+load_dotenv()
 
 from aiohttp import ClientTimeout, TCPConnector
 from aiogram import Bot, Dispatcher, types, F
@@ -23,8 +27,12 @@ from core.estimates import (
     export_estimate_to_excel
 )
 
-BOT_TOKEN = "8967391567:AAHa6VD74hzBiZhvvP3g62TiV0wZa5eLgxU"
-PROXY_URL = "https://gentle-tree-1a2f.fln5kqj50.workers.dev"
+# Получаем секретные данные из переменных окружения
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+PROXY_URL = os.getenv("PROXY_URL", "https://gentle-tree-1a2f.fln5kqj50.workers.dev")
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения. Пожалуйста, создайте файл .env с переменной BOT_TOKEN.")
 
 # Если используете прокси, установите переменные окружения (опционально)
 os.environ["HTTPS_PROXY"] = PROXY_URL
