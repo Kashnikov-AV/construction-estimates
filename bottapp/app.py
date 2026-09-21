@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.estimates import (
     parse_estimate as core_parse_estimate,
     export_estimates_to_csv,
-    calculate_totals_by_category,
+    calculate_totals_by_positions,
     export_estimate_to_excel,
     delete_duplicates
 )
@@ -168,35 +168,32 @@ async def handle_document(message: types.Message) -> None:
         # Используем очищенные DataFrame для дальнейшей обработки
         dfs = dfs_cleaned
         
-        # Вычисляем суммы по материалам и работам для каждого листа
+        # Вычисляем суммы по позициям для каждого листа
         totals_info = []
         for i, df in enumerate(dfs):
             sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
-            totals = await loop.run_in_executor(None, calculate_totals_by_category, df)
+            totals = await loop.run_in_executor(None, calculate_totals_by_positions, df)
             totals_info.append({
                 'sheet': sheet_name,
-                'materials_total': totals['materials_total'],
-                'works_total': totals['works_total'],
-                'materials_count': totals['materials_count'],
-                'works_count': totals['works_count']
+                'positions_total': totals['positions_total'],
+                'positions_count': totals['positions_count']
             })
 
         # Формируем сообщение с суммами
         summary_message = "📊 Сводка по смете:\n\n"
         for info in totals_info:
             summary_message += f"📄 {info['sheet']}:\n"
-            summary_message += f"   🔹 Материалы: {info['materials_count']} поз. на сумму {info['materials_total']:,.2f} руб.\n"
-            summary_message += f"   🔹 Работы: {info['works_count']} поз. на сумму {info['works_total']:,.2f} руб.\n"
-            summary_message += f"   💰 Итого: {info['materials_total'] + info['works_total']:,.2f} руб.\n\n"
+            summary_message += f"   📋 Позиций: {info['positions_count']}\n"
+            summary_message += f"   💰 Итого: {info['positions_total']:,.2f} руб.\n\n"
 
         # Отправляем сообщение с суммами
         await message.answer(summary_message)
 
-        # Экспортируем в Excel с разделением на материалы и работы
+        # Экспортируем в Excel с позициями сметы
         base_filename = os.path.splitext(file_name)[0]
         excel_content, output_filename = await loop.run_in_executor(None, export_estimate_to_excel, dfs, base_filename)
 
-        caption = "✅ Excel файл с разделением на Материалы и Работы готов!"
+        caption = "✅ Excel файл с позициями сметы готов!"
 
         # Отправляем Excel файл
         await message.answer_document(

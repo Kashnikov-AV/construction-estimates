@@ -17,8 +17,6 @@ from core.config_keywords import (
 
 
 KEYS = ["№ п/п", "Обоснование", "Наименование работ и затрат"]
-COLS = ["№", "Обоснование", "Наименование", "Ед.изм.", "Кол-во на ед.", "Коэф.",
-        "Кол-во всего", "Цена баз.", "Индекс", "Цена тек.", "Коэф.2", "Стоимость"]
 
 norm = lambda v: "" if v is None or (isinstance(v, float) and np.isnan(v)) \
                  else re.sub(r"\s+", " ", str(v)).strip()
@@ -362,6 +360,155 @@ def calculate_totals_by_category(df: pd.DataFrame) -> dict:
     }
 
 
+def extract_positions_by_sections(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Извлекает позиции сметы по разделам (позициям).
+    
+    Алгоритм:
+    1. Находит строки где № п/п - целое число (1, 2, 3 без точек) - начало позиции
+    2. Для каждой позиции ищет строку "Всего по позиции" в колонке "Наименование работ и затрат"
+    3. Берет данные из первой строки (Наименование работ и затрат, Единица измерения, всего с учётом коэффициентов)
+    4. Берет стоимость из последней строки ("Всего по позиции") из колонки "всего в текущем уровне цен"
+    
+    Args:
+        df: DataFrame с данными сметы
+    
+    Returns:
+        DataFrame с позициями: [№ п/п, Наименование работ и затрат, Единица измерения, всего с учётом коэффициентов, всего в текущем уровне цен]
+    """
+    if df.empty:
+        return pd.DataFrame(columns=["№ п/п", "Наименование работ и затрат", "Единица измерения", "всего с учётом коэффициентов", "всего в текущем уровне цен"])
+    
+    result_rows = []
+    current_position = None
+    current_row_idx = None
+    
+    # Нормализуем названия колонок для поиска
+    col_num = None
+    col_name = None
+    col_unit = None
+    col_qty_total = None
+    col_cost = None
+    
+    # Ищем соответствия колонок по оригинальным названиям
+    for col in df.columns:
+        col_lower = str(col).lower().strip()
+        if "№" in col_lower or "п/п" in col_lower or col_lower == "№":
+            col_num = col
+        elif "наименование" in col_lower:
+            col_name = col
+        elif "ед." in col_lower or "единиц" in col_lower or "изм" in col_lower:
+            col_unit = col
+        elif "всего" in col_lower and ("количеств" in col_lower or "кол-" in col_lower or "учётом" in col_lower):
+            col_qty_total = col
+        elif "всего в текущем" in col_lower or ("стоимость" in col_lower and "всего" in col_lower):
+            col_cost = col
+    
+    # Если не нашли точных совпадений, используем стандартные имена
+    if col_num is None:
+        col_num = "№ п/п" if "№ п/п" in df.columns else df.columns[0]
+    if col_name is None:
+        col_name = "Наименование работ и затрат" if "Наименование работ и затрат" in df.columns else df.columns[2]
+    if col_unit is None:
+        col_unit = "Единица измерения" if "Единица измерения" in df.columns else df.columns[3]
+    if col_qty_total is None:
+        col_qty_total = "всего с учётом коэффициентов" if "всего с учётом коэффициентов" in df.columns else df.columns[6]
+    if col_cost is None:
+        col_cost = "всего в текущем уровне цен" if "всего в текущем уровне цен" in df.columns else df.columns[-1]
+    
+    def parse_cost(value):
+        """Очистка стоимости от пробелов, символов валюты и преобразование в float"""
+        if pd.isna(value) or value is None:
+            return 0.0
+        s = str(value).strip()
+        # Удаляем символы валюты и пробелы
+        s = re.sub(r'[₽\s]', '', s)
+        s = re.sub(r'руб\.?', '', s, flags=re.IGNORECASE)
+        s = s.replace(',', '.').strip()
+        try:
+            return float(s)
+        except (ValueError, TypeError):
+            return 0.0
+    
+    def is_integer_number(val):
+        """Проверяет, является ли значение целым числом (без точек)"""
+        if pd.isna(val) or val is None:
+            return False
+        s = str(val).strip()
+        if not s:
+            return False
+        # Проверяем что строка состоит только из цифр
+        return bool(re.fullmatch(r'\d+', s))
+    
+    for idx, row in df.iterrows():
+        num_val = row.get(col_num, "")
+        name_val = row.get(col_name, "")
+        
+        # Проверяем начало новой позиции (целое число в №)
+        if is_integer_number(num_val):
+            # Сохраняем текущую позицию если она была
+            current_position = {
+                '№ п/п': str(num_val).strip(),
+                'Наименование работ и затрат': str(row.get(col_name, "")).strip(),
+                'Единица измерения': str(row.get(col_unit, "")).strip(),
+                'всего с учётом коэффициентов': str(row.get(col_qty_total, "")).strip(),
+                'всего в текущем уровне цен': 0.0
+            }
+            current_row_idx = idx
+        
+        # Проверяем строку "Всего по позиции"
+        elif current_position is not None and name_val is not None:
+            name_str = str(name_val).lower().strip()
+            if "всего по позиции" in name_str or "всего по разделу" in name_str:
+                # Нашли итоговую строку позиции - берем стоимость
+                cost_val = parse_cost(row.get(col_cost, 0))
+                current_position['всего в текущем уровне цен'] = cost_val
+                result_rows.append(current_position)
+                current_position = None
+                current_row_idx = None
+    
+    # Создаем результирующий DataFrame с новыми названиями колонок
+    result_df = pd.DataFrame(result_rows, columns=["№ п/п", "Наименование работ и затрат", "Единица измерения", "всего с учётом коэффициентов", "всего в текущем уровне цен"])
+    
+    # Переименовываем колонки в итоговом виде
+    rename_map = {
+        "№ п/п": "№ п/п",
+        "Наименование работ и затрат": "наименование",
+        "Единица измерения": "ед. измерения",
+        "всего с учётом коэффициентов": "объем",
+        "всего в текущем уровне цен": "стоимость"
+    }
+    result_df = result_df.rename(columns=rename_map)
+    return result_df
+
+
+def calculate_totals_by_positions(df: pd.DataFrame) -> dict:
+    """
+    Вычисляет суммы по позициям сметы (без разделения на материалы/работы).
+    
+    Args:
+        df: DataFrame с данными сметы
+    
+    Returns:
+        Словарь с суммами: {'positions_total': float, 'positions_count': int}
+    """
+    positions_df = extract_positions_by_sections(df)
+    
+    if positions_df.empty:
+        return {
+            'positions_total': 0.0,
+            'positions_count': 0
+        }
+    
+    # Преобразуем колонку "стоимость" в числовой формат
+    positions_total = pd.to_numeric(positions_df['стоимость'], errors='coerce').fillna(0).sum()
+    
+    return {
+        'positions_total': positions_total,
+        'positions_count': len(positions_df)
+    }
+
+
 
 def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -451,7 +598,7 @@ def delete_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
 def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
     """
-    Экспорт сметы в Excel файл с двумя листами: Материалы и Работы.
+    Экспорт сметы в Excel файл с позициями.
     Если несколько листов в исходной смете, они объединяются в один Excel файл.
     
     Args:
@@ -477,33 +624,23 @@ def export_estimate_to_excel(dfs, base_filename: str) -> tuple[bytes, str]:
             # Применяем очистку от дубликатов к исходному DataFrame
             df_cleaned = delete_duplicates(df)
             
-            # Разделяем на материалы и работы
-            materials_df, works_df = split_estimate_to_materials_and_works(df_cleaned)
+            # Извлекаем позиции по разделам
+            positions_df = extract_positions_by_sections(df_cleaned)
             
             # Формируем имена листов с префиксом оригинального листа если их несколько
             prefix = f"{safe_sheet_name}_" if len(dfs) > 1 else ""
             
-            # Лист 1: Материалы
-            materials_sheet_name = f"{prefix}Материалы"
-            if not materials_df.empty:
-                materials_df.to_excel(writer, sheet_name=materials_sheet_name[:31], index=False)
+            # Лист: Позиции
+            positions_sheet_name = f"{prefix}Позиции"
+            if not positions_df.empty:
+                positions_df.to_excel(writer, sheet_name=positions_sheet_name[:31], index=False)
             else:
-                # Создаем пустой лист если нет материалов
-                pd.DataFrame({'Наименование': ['Нет данных']}).to_excel(
-                    writer, sheet_name=materials_sheet_name[:31], index=False
-                )
-            
-            # Лист 2: Работы
-            works_sheet_name = f"{prefix}Работы"
-            if not works_df.empty:
-                works_df.to_excel(writer, sheet_name=works_sheet_name[:31], index=False)
-            else:
-                # Создаем пустой лист если нет работ
-                pd.DataFrame({'Наименование': ['Нет данных']}).to_excel(
-                    writer, sheet_name=works_sheet_name[:31], index=False
+                # Создаем пустой лист если нет позиций
+                pd.DataFrame({'Наименование работ и затрат': ['Нет данных']}).to_excel(
+                    writer, sheet_name=positions_sheet_name[:31], index=False
                 )
     
     excel_content = excel_buffer.getvalue()
-    excel_filename = f"{base_filename}_clear.xlsx"
+    excel_filename = f"{base_filename}_positions.xlsx"
     
     return excel_content, excel_filename
