@@ -1,36 +1,55 @@
-```python
-# Python
-__pycache__/
+```
+# Compiled and build artifacts
 *.pyc
+__pycache__/
+
+# Dependencies
+.venv/
+venv/
+node_modules/
+dist/
+build/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Python specific
 *.pyo
 *.pyd
+*.so
+*.egg-info/
 .Python
-env/
-venv/
-.venv/
 pip-log.txt
 pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/modules/
-*.sconsign.dblite
-.sconsign
-*.pdb
-*.prof
-.project
-.pydevproject
-.ijwb/
-.idea/
-.vscode/
+
+# Backup files
+*~
+*.bak
 *.swp
 *.swo
-*~
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 ```
