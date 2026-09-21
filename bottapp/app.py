@@ -162,10 +162,11 @@ async def handle_document(message: types.Message) -> None:
 
         for i, df in enumerate(dfs):
             sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
-            res = await loop.run_in_executor(None, extract_positions_by_sections, df)
-            processed_dfs.append(res)
+            # Очищаем данные (оставляем только целые позиции)
+            clean_df = await loop.run_in_executor(None, extract_positions_by_sections, df)
+            processed_dfs.append(clean_df)
         
-        # Вычисляем суммы по позициям для каждого листа
+        # Вычисляем суммы по позициям для каждого листа (на основе обработанных данных)
         totals_info = []
         for i, df in enumerate(processed_dfs):
             sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
@@ -186,9 +187,9 @@ async def handle_document(message: types.Message) -> None:
         # Отправляем сообщение с суммами
         await message.answer(summary_message)
 
-        # Экспортируем в Excel с позициями сметы
+        # ЭКСПОРТИРУЕМ ИМЕННО ОБРАБОТАННЫЕ ДАННЫЕ (processed_dfs), А НЕ СЫРЫЕ (dfs)
         base_filename = os.path.splitext(file_name)[0]
-        excel_content, output_filename = await loop.run_in_executor(None, export_estimate_to_excel, dfs, base_filename)
+        excel_content, output_filename = await loop.run_in_executor(None, export_estimate_to_excel, processed_dfs, base_filename)
 
         caption = "✅ Excel файл с позициями сметы готов!"
 
