@@ -22,10 +22,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.estimates import (
     parse_estimate as core_parse_estimate,
-    export_estimates_to_csv,
+    extract_positions_by_sections,
     calculate_totals_by_positions,
-    export_estimate_to_excel,
-    delete_duplicates
+    export_estimate_to_excel
 )
 
 # Получаем секретные данные из переменных окружения
@@ -158,10 +157,17 @@ async def handle_document(message: types.Message) -> None:
             return
 
         logger.info(f"Успешно распарсено {len(dfs)} листов из файла {file_name}")
+
+        processed_dfs = []
+
+        for i, df in enumerate(dfs):
+            sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
+            res = await loop.run_in_executor(None, extract_positions_by_sections, df)
+            processed_dfs.append(res)
         
         # Вычисляем суммы по позициям для каждого листа
         totals_info = []
-        for i, df in enumerate(dfs):
+        for i, df in enumerate(processed_dfs):
             sheet_name = df.attrs.get("sheet", f"Лист {i+1}")
             totals = await loop.run_in_executor(None, calculate_totals_by_positions, df)
             totals_info.append({
