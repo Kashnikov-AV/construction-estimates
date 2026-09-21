@@ -10,7 +10,7 @@ import re
 # Импорт бизнес-логики из core
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.estimates import parse_estimate as core_parse_estimate, export_estimates_to_csv
+from core.estimates import parse_estimate as core_parse_estimate, export_estimates_to_csv, extract_positions_by_sections, delete_duplicates
 
 app = FastAPI(title="Smeta PWA")
 
