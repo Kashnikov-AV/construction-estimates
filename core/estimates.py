@@ -98,7 +98,13 @@ def parse_estimate(file_input: Union[str, io.BytesIO], **kwargs: Any) -> List[pd
                 if any(vals):
                     rows.append(vals)
                 i += 1
-        df = pd.DataFrame(rows, columns=COLS)
+        
+        # Создаем DataFrame без жестких имен колонок - они будут определены позже
+        if rows:
+            df = pd.DataFrame(rows)
+        else:
+            df = pd.DataFrame()
+        
         if not df.empty:
             df.attrs["sheet"] = sh
             out.append(df)
