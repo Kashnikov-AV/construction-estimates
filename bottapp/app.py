@@ -158,15 +158,6 @@ async def handle_document(message: types.Message) -> None:
             return
 
         logger.info(f"Успешно распарсено {len(dfs)} листов из файла {file_name}")
-
-        # Применяем очистку от дубликатов к каждому листу
-        dfs_cleaned = []
-        for i, df in enumerate(dfs):
-            df_cleaned = await loop.run_in_executor(None, delete_duplicates, df)
-            dfs_cleaned.append(df_cleaned)
-        
-        # Используем очищенные DataFrame для дальнейшей обработки
-        dfs = dfs_cleaned
         
         # Вычисляем суммы по позициям для каждого листа
         totals_info = []
