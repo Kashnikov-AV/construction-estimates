@@ -29,20 +29,20 @@ from core.estimates import (
 
 # Получаем секретные данные из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-PROXY_URL = os.getenv("PROXY_URL", "https://gentle-tree-1a2f.fln5kqj50.workers.dev")
+# PROXY_URL = os.getenv("PROXY_URL", "https://gentle-tree-1a2f.fln5kqj50.workers.dev")
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден в переменных окружения. Пожалуйста, создайте файл .env с переменной BOT_TOKEN.")
 
 # Если используете прокси, установите переменные окружения (опционально)
-os.environ["HTTPS_PROXY"] = PROXY_URL
-os.environ["HTTP_PROXY"] = PROXY_URL
+# os.environ["HTTPS_PROXY"] = PROXY_URL
+# os.environ["HTTP_PROXY"] = PROXY_URL
 
 dp = Dispatcher()
-api_server = TelegramAPIServer.from_base(PROXY_URL)
+# api_server = TelegramAPIServer.from_base(PROXY_URL)
 # Увеличенные таймауты для сессии: connect=30s, read=120s, write=120s, pool=60s
 session = AiohttpSession(
-    api=api_server,
+    # api=api_server,
     timeout=60
 )
 bot = Bot(token=BOT_TOKEN, session=session)
@@ -66,7 +66,7 @@ async def command_start_handler(message: types.Message) -> None:
         "📄 Как использовать:\n"
         "1. Отправьте мне файл локальной сметы в формате `.xls` или `.xlsx`\n"
         "2. Я обработаю файл и извлеку все данные\n"
-        "3. Вы получите очищенный CSV файл (или ZIP при нескольких листах)\n\n"
+        "3. Вы получите очищенный excel файл (или ZIP при нескольких листах)\n\n"
         "🔧 Команды:\n"
         "/help - подробная справка\n"
         "/status - проверка работоспособности"
@@ -81,11 +81,11 @@ async def command_help_handler(message: types.Message) -> None:
         "Я умею:\n"
         "• Обрабатывать сметы в форматах .xls и .xlsx\n"
         "• Извлекать данные из таблиц смет\n"
-        "• Экспортировать результаты в CSV формат\n\n"
+        "• Экспортировать результаты в excel формат\n\n"
         "📤 Как использовать:\n"
         "1. Отправьте мне файл сметы\n"
         "2. Дождитесь обработки\n"
-        "3. Получите готовый CSV файл\n\n"
+        "3. Получите готовый excel файл\n\n"
         "⚠️ Важно:\n"
         "• Максимальный размер файла: 20 МБ\n"
         "• Поддерживаются форматы .xls и .xlsx"
