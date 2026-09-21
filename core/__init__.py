@@ -4,10 +4,9 @@ Core module for estimate processing.
 
 from .estimates import (
     parse_estimate,
-    export_estimates_to_csv,
-    classify_estimate_items,
-    filter_estimate_by_category,
-    get_estimate_summary,
+    extract_positions_by_sections,
+    calculate_totals_by_positions,
+    export_estimate_to_excel,
     WORK_KEYWORDS,
     MATERIAL_KEYWORDS,
     WORK_UNITS
@@ -15,10 +14,9 @@ from .estimates import (
 
 __all__ = [
     'parse_estimate',
-    'export_estimates_to_csv',
-    'classify_estimate_items',
-    'filter_estimate_by_category',
-    'get_estimate_summary',
+    'extract_positions_by_sections',
+    'calculate_totals_by_positions',
+    'export_estimate_to_excel',
     'WORK_KEYWORDS',
     'MATERIAL_KEYWORDS',
     'WORK_UNITS'

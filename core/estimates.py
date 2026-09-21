@@ -183,24 +183,38 @@ def extract_positions_by_sections(df: pd.DataFrame) -> pd.DataFrame:
             return 0.0
     
     def is_integer_number(val):
-        """Проверяет, является ли значение целым числом (без точек)"""
+        """Проверяет, является ли значение целым числом (возможно с буквой 'О' после)"""
         if pd.isna(val) or val is None:
             return False
         s = str(val).strip()
         if not s:
             return False
-        # Проверяем что строка состоит только из цифр
-        return bool(re.fullmatch(r'\d+', s))
+        # Проверяем что строка начинается с цифр (целое число, возможно с буквой 'О' или 'O' после)
+        # Например: "106", "106 О", "245О"
+        return bool(re.fullmatch(r'\d+\s*[ОO]?\s*', s, re.IGNORECASE))
+    
+    def extract_position_number(val):
+        """Извлекает номер позиции из значения (удаляет букву 'О' если есть)"""
+        if pd.isna(val) or val is None:
+            return None
+        s = str(val).strip()
+        match = re.match(r'(\d+)', s)
+        if match:
+            return match.group(1)
+        return None
     
     for idx, row in df.iterrows():
         num_val = row.get(col_num, "")
         name_val = row.get(col_name, "")
         
-        # Проверяем начало новой позиции (целое число в №)
+        # Проверяем начало новой позиции (целое число в №, возможно с буквой 'О')
         if is_integer_number(num_val):
+            # Извлекаем чистый номер позиции (без буквы 'О')
+            pos_num = extract_position_number(num_val)
+            
             # Сохраняем текущую позицию если она была
             current_position = {
-                '№ п/п': str(num_val).strip(),
+                '№ п/п': pos_num,
                 'Наименование работ и затрат': str(row.get(col_name, "")).strip(),
                 'Единица измерения': str(row.get(col_unit, "")).strip(),
                 'всего с учётом коэффициентов': str(row.get(col_qty_total, "")).strip(),
